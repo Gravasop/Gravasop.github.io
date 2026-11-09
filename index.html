@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Συμπλήρωση Ημερομηνιών</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  :root{
+    --hdr:#E9E1F5; --hdr-text:#3B2560; --accent:#6B46A3; --accent-text:#ffffff;
+    --c-yellow:#FFFF00; --c-pair:#FFD1DC; --c-weekend:#D9D2E9; --c-absence:#FF9696; --c-f1:#FCD5B4;
+    --c-green:#C6EFCE; --c-red:#FFC7CE;
+    --bg:#F7F5FA; --card:#FFFFFF; --field:#FFFFFF; --line:#D9D1E6; --text:#2A2433; --muted:#6E6680;
+    --row-line:#ECE7F3; --hover:#F3EEFA;
+  }
+  html{color-scheme:light}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Aptos Display","Aptos","Segoe UI",system-ui,-apple-system,sans-serif;font-size:15px}
+  header{background:var(--accent);color:var(--accent-text);padding:14px 20px;text-align:center}
+  header h1{margin:0;font-size:20px;font-weight:700}
+  header p{margin:4px 0 0;font-size:13px;opacity:.9}
+  main{display:grid;grid-template-columns:400px minmax(0,520px);justify-content:center;gap:20px;
+    padding:18px;align-items:start;max-width:1000px;margin:0 auto}
+  @media (max-width:920px){main{grid-template-columns:minmax(0,520px)}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h2{margin:-14px -14px 12px;padding:8px 14px;background:var(--hdr);color:var(--hdr-text);
+    font-size:14px;font-weight:700;text-align:center;border-radius:10px 10px 0 0}
+  label.abs{grid-template-columns:110px 1fr 30px}
+  label{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:8px;margin:6px 0;font-weight:600}
+  input,select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%;background:var(--field);color:var(--text)}
+  input::placeholder{color:var(--muted)}
+  .df{position:relative;display:flex;gap:4px;align-items:center}
+  .df .dt{flex:1}
+  .df .cal{border:1px solid var(--line);background:var(--field);border-radius:6px;cursor:pointer;width:34px;height:32px;padding:0;font-size:15px}
+  .df .cal:hover{background:var(--hover)}
+  .df .dp{position:absolute;right:0;bottom:0;width:34px;height:0;padding:0;border:0;opacity:0;pointer-events:none}
+  .dt.bad{border-color:#e06a7a;outline:1px solid #e06a7a}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  table.edit{width:100%;border-collapse:collapse}
+  table.edit th{background:var(--hdr);color:var(--hdr-text);font-weight:700;text-align:center;padding:6px;font-size:13px}
+  table.edit td{padding:3px}
+  table.edit td:first-child{width:126px}
+  table.edit .df .dt{min-width:0;padding:6px 6px}
+  table.edit td.del{width:34px;text-align:center}
+  .icon-btn{border:1px solid var(--line);background:var(--field);color:var(--text);border-radius:6px;cursor:pointer;width:30px;height:30px;font-size:16px;line-height:1}
+  .icon-btn:hover{background:var(--hover)}
+  .small-btn{margin-top:8px;border:1px dashed var(--accent);background:transparent;color:var(--accent);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit;font-weight:600}
+  .hint{color:var(--muted);font-size:12px;margin:6px 0 0}
+  .run{display:block;width:100%;padding:16px;font:inherit;font-size:17px;font-weight:700;color:var(--accent-text);background:var(--accent);
+    border:none;border-radius:10px;cursor:pointer}
+  .run:hover{filter:brightness(1.08)}
+  .errors{display:none;background:#FDEEEF;border:1px solid #E7A9B0;color:#8A1C2B;border-radius:8px;padding:10px 12px;margin-bottom:14px}
+  .errors.show{display:block}
+  .result-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .target{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--line);font-weight:700}
+  .target span{padding:8px 12px;text-align:center;min-width:96px;color:#111}
+  .target .lbl{background:var(--hdr);color:var(--hdr-text)}
+  .export{padding:8px 14px;font:inherit;font-weight:700;border-radius:8px;border:1px solid var(--accent);background:#fff;color:var(--accent);cursor:pointer}
+  .export:hover:not(:disabled){background:var(--hover)}
+  .export:disabled{opacity:.4;cursor:default}
+  .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 12px;font-size:12px;color:var(--muted);margin-bottom:10px}
+  .legend i{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid #0003;vertical-align:-2px;margin-right:4px}
+  .out-wrap{max-height:calc(100vh - 210px);overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+  table.out{border-collapse:collapse;width:100%}
+  table.out th{position:sticky;top:0;background:var(--hdr);color:var(--hdr-text);font-weight:700;text-align:center;padding:8px;z-index:1;box-shadow:inset 0 -2px 0 var(--accent)}
+  table.out td{padding:5px 8px;border-bottom:1px solid var(--row-line);white-space:nowrap}
+  table.out td:nth-child(4){white-space:normal}
+  table.out tr.colored td{color:#111;border-bottom-color:#0002}
+  table.out td.c, table.out td.d{text-align:center}
+  table.out tr.bold td{font-weight:700}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .status{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Συμπλήρωση Ημερομηνιών</h1>
+  <p>Συμπληρώστε τα στοιχεία και πατήστε «Συμπλήρωση στοιχείων».</p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Ημερομηνίες</h2>
+      <label>Ημερομηνία A <span class="df"><input type="text" class="dt" inputmode="numeric" placeholder="ηη/μμ/εεεε" id="dA"><button class="cal" type="button" tabindex="-1" title="Ημερολόγιο">📅</button><input type="date" class="dp" tabindex="-1" aria-hidden="true"></span></label>
+      <label>Ημερομηνία B <span class="df"><input type="text" class="dt" inputmode="numeric" placeholder="ηη/μμ/εεεε" id="dB"><button class="cal" type="button" tabindex="-1" title="Ημερολόγιο">📅</button><input type="date" class="dp" tabindex="-1" aria-hidden="true"></span></label>
+      <label>Ημερομηνία C <span class="df"><input type="text" class="dt" inputmode="numeric" placeholder="ηη/μμ/εεεε" id="dC"><button class="cal" type="button" tabindex="-1" title="Ημερολόγιο">📅</button><input type="date" class="dp" tabindex="-1" aria-hidden="true"></span></label>
+    </div>
+
+    <div class="card">
+      <h2>Ημέρα</h2>
+      <label>Ημέρα <select id="f1">
+        <option>Δευτέρα</option><option>Τρίτη</option><option>Τετάρτη</option><option>Πέμπτη</option><option>Παρασκευή</option>
+      </select></label>
+    </div>
+
+    <div class="card">
+      <h2>Αργίες</h2>
+      <table class="edit">
+        <thead><tr><th>Ημερομηνία</th><th>Όνομα</th><th></th></tr></thead>
+        <tbody id="holidays"></tbody>
+      </table>
+      <button class="small-btn" id="addHoliday" type="button">+ Προσθήκη</button>
+      <button class="small-btn" id="addDefaults" type="button">↺ Σταθερές αργίες</button>
+      <p class="hint">Γράψτε <b>ηη/μμ</b> για αργία κάθε χρόνο ή <b>ηη/μμ/εεεε</b> για μία συγκεκριμένη χρονιά.
+        Μπορείτε επίσης να επικολλήσετε γραμμές από το Excel (Ημερομηνία ⇥ Όνομα).</p>
+    </div>
+
+    <div class="card">
+      <h2>Απουσίες</h2>
+      <div id="absences"></div>
+    </div>
+
+    <div id="errors" class="errors" role="alert"></div>
+    <button class="run" id="run" type="button">Συμπλήρωση στοιχείων</button>
+    <p class="status" id="saveStatus"></p>
+  </section>
+
+  <section>
+    <div class="result-top">
+      <div class="target" id="target">
+        <span class="lbl">156η μονάδα</span><span id="tDate">-</span><span id="tDay">-</span>
+      </div>
+      <button class="export" id="export" type="button" disabled>Εξαγωγή σε Excel</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--c-yellow)"></i>Ημερομηνία C / 156η μονάδα</span>
+      <span><i style="background:var(--c-pair)"></i>Αργία</span>
+      <span><i style="background:var(--c-weekend)"></i>Σαββατοκύριακο</span>
+      <span><i style="background:var(--c-absence)"></i>Απουσία</span>
+      <span><i style="background:var(--c-f1)"></i>Ημέρα επιλογής</span>
+    </div>
+    <div class="out-wrap">
+      <table class="out">
+        <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Τιμή</th><th>Όνομα</th></tr></thead>
+        <tbody id="out"><tr><td colspan="4" class="empty">Δεν υπάρχουν αποτελέσματα ακόμα.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+// ===================== Ρυθμίσεις =====================
+const TARGET_ONES = 156;
+const LESSON_TEXT = "Μάθημα";
+const ABSENCE_TEXT = "Απουσία";
+const LESSON_END = { month: 6, day: 30 };      // τέλος περιόδου "Μάθημα": 30/6
+const ABSENCE_COUNT = 5;
+const DAY_NAMES = ["Κυριακή","Δευτέρα","Τρίτη","Τετάρτη","Πέμπτη","Παρασκευή","Σάββατο"];
+const F1_DAYS = ["Δευτέρα","Τρίτη","Τετάρτη","Πέμπτη","Παρασκευή"];
+const COLORS = { yellow:"FFFF00", pair:"FFD1DC", weekend:"D9D2E9", absence:"FF9696", f1:"FCD5B4",
+                 green:"C6EFCE", red:"FFC7CE", header:"9266CC" };
+const STORE_KEY = "dateFiller.inputs.v1";
+// Σταθερές αργίες: ίδια ημερομηνία κάθε χρόνο (μμ-ηη)
+const DEFAULT_HOLIDAYS = [
+  ["10-28","Επέτειος του «Όχι»"],
+  ["12-25","Χριστούγεννα"],
+  ["12-26","Σύναξη της Θεοτόκου"],
+  ["01-01","Πρωτοχρονιά"],
+  ["01-06","Θεοφάνια"],
+  ["03-25","25η Μαρτίου"],
+  ["08-15","Κοίμηση της Θεοτόκου"]
+];
+
+// ===================== Ημερομηνίες ως αριθμός ημερών (UTC) =====================
+const DAY_MS = 86400000;
+function isoToDay(iso){ if(!iso) return null; const [y,m,d]=iso.split("-").map(Number);
+  if(!y||!m||!d) return null; return Math.floor(Date.UTC(y,m-1,d)/DAY_MS); }
+function dayToDate(n){ return new Date(n*DAY_MS); }
+function fmt(n){ const t=dayToDate(n); return String(t.getUTCDate()).padStart(2,"0")+"/"+
+  String(t.getUTCMonth()+1).padStart(2,"0")+"/"+t.getUTCFullYear(); }
+function weekdayMon1(n){ const w=dayToDate(n).getUTCDay(); return w===0?7:w; }   // 1=Δευτέρα ... 7=Κυριακή
+function dayName(n){ return DAY_NAMES[dayToDate(n).getUTCDay()]; }
+function dayToIso(n){ return dayToDate(n).toISOString().slice(0,10); }
+// Ανάγνωση ημερομηνίας από κείμενο (επικόλληση): dd/mm/yyyy, d.m.yyyy, yyyy-mm-dd ή αριθμός Excel
+function ymd(y,mo,d){ const t=new Date(Date.UTC(y,mo-1,d));
+  if(t.getUTCFullYear()!==y||t.getUTCMonth()!==mo-1||t.getUTCDate()!==d) return null;   // π.χ. 31/02
+  return Math.floor(t.getTime()/DAY_MS); }
+function parseLooseDate(s){
+  s=String(s||"").trim(); if(!s) return null;
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return ymd(+m[1],+m[2],+m[3]);
+  m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/);
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return ymd(y,+m[2],+m[1]); }
+  m=s.match(/^(\d{2})(\d{2})(\d{4})$/); if(m) return ymd(+m[3],+m[2],+m[1]);    // ηημμεεεε
+  m=s.match(/^(\d{2})(\d{2})(\d{2})$/); if(m) return ymd(2000+ +m[3],+m[2],+m[1]); // ηημμεε
+  if(/^\d{5}$/.test(s)) return +s - 25569;      // σειριακός αριθμός Excel
+  return null;
+}
+
+// ===================== Πεδία ημερομηνίας (πάντα ηη/μμ/εεεε) =====================
+const DF_HTML = '<span class="df"><input type="text" class="dt" inputmode="numeric" placeholder="ηη/μμ/εεεε"><button class="cal" type="button" tabindex="-1" title="Ημερολόγιο">📅</button><input type="date" class="dp" tabindex="-1" aria-hidden="true"></span>';
+// Αργία κάθε χρόνο: "ηη/μμ" -> "μμ-ηη" (ή null)
+function parseRecurring(s){
+  s=String(s||"").trim(); if(s.startsWith("R:")) s=s.slice(2).split("-").reverse().join("/");
+  const m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})$/); if(!m) return null;
+  if(ymd(2000,+m[2],+m[1])===null) return null;          // 2000: δίσεκτο, άρα δέχεται και 29/02
+  return String(+m[2]).padStart(2,"0")+"-"+String(+m[1]).padStart(2,"0");
+}
+function fmtRecurring(md){ const [mo,d]=md.split("-"); return d+"/"+mo; }
+function mdOf(n){ return dayToIso(n).slice(5); }
+// Τιμή πεδίου: "" (κενό), ISO "εεεε-μμ-ηη", "R:μμ-ηη" (κάθε χρόνο, μόνο στις αργίες) ή "invalid"
+function getDateIso(t){ const v=t.value.trim(); if(!v) return "";
+  const n=parseLooseDate(v); if(n!==null) return dayToIso(n);
+  if(t.dataset.recur){ const md=parseRecurring(v); if(md) return "R:"+md; }
+  return "invalid"; }
+// Ορισμός τιμής από ISO, ηη/μμ/εεεε ή (στις αργίες) ηη/μμ / "R:μμ-ηη"
+function setDateText(t, v){
+  const md = t.dataset.recur ? parseRecurring(v) : null;
+  const n = md ? null : parseLooseDate(v);
+  t.value = md ? fmtRecurring(md) : (n===null ? (v||"") : fmt(n)); t.classList.remove("bad"); }
+function wireDateFields(root){
+  root.querySelectorAll(".df").forEach(df=>{
+    if(df.dataset.wired) return; df.dataset.wired="1";
+    const t=df.querySelector(".dt"), p=df.querySelector(".dp");
+    t.addEventListener("blur",()=>{ const v=t.value.trim(); if(!v){t.classList.remove("bad");return;}
+      const iso=getDateIso(t); if(iso==="invalid") t.classList.add("bad"); else setDateText(t,iso); save(); });
+    df.querySelector(".cal").addEventListener("click",()=>{
+      const iso=getDateIso(t); p.value = (iso && iso!=="invalid") ? iso : "";
+      try{ p.showPicker(); }catch(e){ p.style.pointerEvents="auto"; p.focus(); p.click(); }
+    });
+    p.addEventListener("change",()=>{ if(p.value){ setDateText(t,p.value); save(); } });
+  });
+}
+
+// ===================== Κατάσταση εισόδων =====================
+const $ = id => document.getElementById(id);
+const holidaysBody = $("holidays");
+const absencesBox = $("absences");
+
+function addHolidayRow(iso="", name=""){
+  const tr=document.createElement("tr");
+  tr.innerHTML='<td>'+DF_HTML+'</td><td><input type="text" class="nm" placeholder="Όνομα"></td>'+
+               '<td class="del"><button class="icon-btn" type="button" title="Διαγραφή">×</button></td>';
+  const dt=tr.querySelector(".dt"); dt.dataset.recur="1"; dt.placeholder="ηη/μμ(/εεεε)";
+  setDateText(dt, iso); tr.querySelector(".nm").value=name;
+  wireDateFields(tr);
+  tr.querySelector(".icon-btn").onclick=()=>{ tr.remove(); if(!holidaysBody.children.length) addHolidayRow(); save(); };
+  tr.addEventListener("input",save);
+  tr.addEventListener("paste",onHolidayPaste);
+  holidaysBody.appendChild(tr);
+  return tr;
+}
+function onHolidayPaste(e){
+  const text=(e.clipboardData||window.clipboardData).getData("text");
+  if(!/[\t\n]/.test(text)) return;              // απλή επικόλληση σε ένα πεδίο
+  e.preventDefault();
+  const rows=text.replace(/\r/g,"").split("\n").map(r=>r.split("\t")).filter(r=>r.some(c=>c.trim()));
+  let first=true;
+  for(const r of rows){
+    const day=parseLooseDate(r[0]), md=day===null?parseRecurring(r[0]):null;
+    if(day===null && !md && !(r[1]||"").trim()) continue;
+    // Η πρώτη γραμμή μπαίνει στη γραμμή όπου έγινε η επικόλληση, οι υπόλοιπες σε νέες γραμμές
+    const target = first ? e.currentTarget : addHolidayRow();
+    setDateText(target.querySelector(".dt"), day!==null ? dayToIso(day) : (md ? "R:"+md : ""));
+    target.querySelector(".nm").value=(r[1]||"").trim();
+    first=false;
+  }
+  save();
+}
+function buildAbsences(values=[]){
+  absencesBox.innerHTML="";
+  for(let i=0;i<ABSENCE_COUNT;i++){
+    const l=document.createElement("label");
+    l.className="abs";
+    l.innerHTML='Απουσία '+(i+1)+' '+DF_HTML+'<button class="icon-btn clr" type="button" title="Καθαρισμός">×</button>';
+    setDateText(l.querySelector(".dt"), values[i]||"");
+    l.querySelector(".clr").addEventListener("click",ev=>{ ev.preventDefault(); const t=l.querySelector(".dt"); t.value=""; t.classList.remove("bad"); save(); });
+    wireDateFields(l);
+    l.addEventListener("input",save);
+    absencesBox.appendChild(l);
+  }
+}
+function readInputs(){
+  return {
+    A:getDateIso($("dA")), B:getDateIso($("dB")), C:getDateIso($("dC")), f1:$("f1").value,
+    holidays:[...holidaysBody.children].map(tr=>({date:getDateIso(tr.querySelector(".dt")),name:tr.querySelector(".nm").value})),
+    absences:[...absencesBox.querySelectorAll(".dt")].map(getDateIso)
+  };
+}
+
+// Αποθήκευση στον browser (προαιρετική)
+function save(){
+  const raw={ A:$("dA").value, B:$("dB").value, C:$("dC").value, f1:$("f1").value,
+    holidays:[...holidaysBody.children].map(tr=>({date:tr.querySelector(".dt").value,name:tr.querySelector(".nm").value})),
+    absences:[...absencesBox.querySelectorAll(".dt")].map(t=>t.value), defaultsAdded:true };
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(raw)); $("saveStatus").textContent="Τα στοιχεία αποθηκεύτηκαν σε αυτόν τον browser."; }
+  catch(e){ $("saveStatus").textContent=""; }
+}
+function load(){
+  let s=null; try{ s=JSON.parse(localStorage.getItem(STORE_KEY)||"null"); }catch(e){}
+  wireDateFields(document);
+  setDateText($("dA"),s?.A||""); setDateText($("dB"),s?.B||""); setDateText($("dC"),s?.C||"");
+  $("f1").value=F1_DAYS.includes(s?.f1)?s.f1:"Δευτέρα";
+  holidaysBody.innerHTML="";
+  const saved=(s?.holidays||[]).filter(h=>(h.date||"").trim()||(h.name||"").trim());
+  saved.forEach(h=>addHolidayRow(h.date,h.name));
+  if(!s?.defaultsAdded) addDefaultHolidays();          // πρώτη φορά: προσθήκη σταθερών αργιών
+  if(!holidaysBody.children.length) addHolidayRow();
+  buildAbsences(s?.absences||[]);
+}
+["dA","dB","dC","f1"].forEach(id=>$(id).addEventListener("input",save));
+$("addHoliday").onclick=()=>{ addHolidayRow().querySelector(".dt").focus(); save(); };
+// Προσθέτει όσες σταθερές αργίες λείπουν (χωρίς διπλότυπα)
+function addDefaultHolidays(){
+  const have=new Set([...holidaysBody.querySelectorAll(".dt")].map(getDateIso));
+  // αφαίρεση κενών γραμμών πριν την προσθήκη
+  [...holidaysBody.children].forEach(tr=>{ if(!tr.querySelector(".dt").value.trim() && !tr.querySelector(".nm").value.trim()) tr.remove(); });
+  DEFAULT_HOLIDAYS.forEach(([md,name])=>{ if(!have.has("R:"+md)) addHolidayRow("R:"+md,name); });
+}
+$("addDefaults").onclick=()=>{ addDefaultHolidays(); save(); };
+
+// ===================== Κανόνες =====================
+// Υπολογίζει τιμή, ετικέτα, χρώμα και έντονα για μία ημερομηνία.
+// Όλοι οι κανόνες ελέγχονται ανεξάρτητα και μετά συνδυάζονται.
+function evaluateRow(d, ctx){
+  const wd=weekdayMon1(d);
+  const isBeforeC = d < ctx.dateC;
+  const isDateC = d === ctx.dateC;
+  const isF1 = wd === ctx.offDay;
+  const isWeekend = wd >= 6;
+  const isLessonPeriod = d >= ctx.dateC && d <= ctx.lessonEnd;
+  const md = mdOf(d);
+  const pairNames = ctx.pairs.filter(p=>p.day===d || p.md===md);   // συγκεκριμένη ημερομηνία ή κάθε χρόνο
+  const isPair = pairNames.length > 0;
+  const names = pairNames.map(p=>p.name).filter(Boolean).join(", ");
+  const isAbsence = ctx.absences.includes(d);
+  const showAbsence = isAbsence && !isWeekend;       // απουσία φαίνεται μόνο σε καθημερινή
+
+  const value = (isBeforeC || isF1 || isWeekend || isPair || isAbsence) ? 0 : 1;
+
+  let label = "";
+  if (isPair && !isBeforeC && names) label = names;
+  else if (showAbsence) label = ABSENCE_TEXT;
+  else if (isF1 && isLessonPeriod) label = LESSON_TEXT;
+
+  let color = null;
+  if (isBeforeC) color = null;
+  else if (isDateC) color = COLORS.yellow;
+  else if (isPair) color = COLORS.pair;
+  else if (isWeekend) color = COLORS.weekend;
+  else if (showAbsence) color = COLORS.absence;
+  else if (isF1) color = COLORS.f1;
+
+  return { day:d, dayName:dayName(d), value, label, color, bold:isDateC };
+}
+
+function compute(inp){
+  const errs=[];
+  const bad=v=>v==="invalid";
+  const A=bad(inp.A)?null:isoToDay(inp.A), B=bad(inp.B)?null:isoToDay(inp.B), C=bad(inp.C)?null:isoToDay(inp.C);
+  if(A===null||B===null) errs.push("Συμπληρώστε έγκυρες ημερομηνίες A και B (μορφή ηη/μμ/εεεε).");
+  else if(B<A) errs.push("Η ημερομηνία B πρέπει να είναι ίδια ή μεταγενέστερη της A.");
+  if(C===null) errs.push("Συμπληρώστε έγκυρη ημερομηνία C (μορφή ηη/μμ/εεεε).");
+  const offDay=F1_DAYS.indexOf(inp.f1)+1;
+  if(offDay<1) errs.push("Επιλέξτε ημέρα (Δευτέρα - Παρασκευή).");
+  if(inp.holidays.some(h=>bad(h.date))) errs.push("Μη έγκυρη ημερομηνία αργίας (μορφή ηη/μμ ή ηη/μμ/εεεε).");
+  if(inp.absences.some(bad)) errs.push("Μη έγκυρη ημερομηνία απουσίας (μορφή ηη/μμ/εεεε).");
+  const pairs=inp.holidays.filter(h=>h.date && !bad(h.date)).map(h=>h.date.startsWith("R:")
+      ? {day:null, md:h.date.slice(2), name:(h.name||"").trim()}
+      : {day:isoToDay(h.date), md:null, name:(h.name||"").trim()});
+  if(!pairs.length) errs.push("Συμπληρώστε τουλάχιστον μία αργία (Ημερομηνία, Όνομα).");
+  if(inp.holidays.some(h=>!h.date && (h.name||"").trim())) errs.push("Υπάρχει αργία με όνομα αλλά χωρίς ημερομηνία.");
+  if(errs.length) return {errs};
+
+  const absences=inp.absences.filter(a=>!bad(a)).map(isoToDay).filter(x=>x!==null);
+  const cy=dayToDate(C).getUTCFullYear();
+  let lessonEnd=Math.floor(Date.UTC(cy,LESSON_END.month-1,LESSON_END.day)/DAY_MS);
+  if(lessonEnd<C) lessonEnd=Math.floor(Date.UTC(cy+1,LESSON_END.month-1,LESSON_END.day)/DAY_MS);
+
+  const ctx={dateC:C,lessonEnd,offDay,pairs,absences};
+  const rows=[]; let ones=0, target=-1;
+  for(let d=A; d<=B; d++){
+    const r=evaluateRow(d,ctx); rows.push(r);
+    if(r.value===1 && ++ones===TARGET_ONES) target=rows.length-1;
+  }
+  if(target>=0){ rows[target].color=COLORS.yellow; rows[target].bold=true; }   // 156η μονάδα
+  return {rows, target};
+}
+
+// ===================== Εμφάνιση =====================
+let lastResult=null;
+function render(res){
+  const box=$("errors");
+  if(res.errs){ box.innerHTML=res.errs.map(e=>"• "+e).join("<br>"); box.classList.add("show"); return; }
+  box.classList.remove("show");
+  const out=$("out"); const frag=document.createDocumentFragment();
+  for(const r of res.rows){
+    const tr=document.createElement("tr");
+    if(r.bold) tr.classList.add("bold");
+    if(r.color){ tr.style.background="#"+r.color; tr.classList.add("colored"); }
+    tr.innerHTML=`<td>${fmt(r.day)}</td><td>${r.dayName}</td><td class="c">${r.value}</td><td class="d"></td>`;
+    tr.lastChild.textContent=r.label;
+    frag.appendChild(tr);
+  }
+  out.replaceChildren(frag);
+  const t=res.target>=0?res.rows[res.target]:null;
+  $("tDate").textContent=t?fmt(t.day):"-"; $("tDay").textContent=t?t.dayName:"-";
+  const bg="#"+(t?COLORS.green:COLORS.red);
+  $("tDate").style.background=bg; $("tDay").style.background=bg;
+  lastResult=res; $("export").disabled=false;
+}
+$("run").onclick=()=>{ save(); render(compute(readInputs())); };
+
+// ===================== Εξαγωγή σε Excel =====================
+async function buildXlsx(res, inp){
+  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet("Sheet1");
+  const FONT={name:"Aptos Display",size:11};
+  const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:"FF"+c}});
+  const hdr=(cell,text)=>{ cell.value=text; cell.font={...FONT,bold:true}; cell.alignment={horizontal:"center"}; cell.fill=fill(COLORS.header); };
+  const toDate=n=>n+25569;        // σειριακός αριθμός ημερομηνίας Excel (χωρίς θέματα ζώνης ώρας)
+
+  ws.columns=[{width:13},{width:13},{width:8},{width:16},{width:9},{width:12},{width:4},{width:12},{width:12},
+              {width:15},{width:13},{width:4},{width:13},{width:18},{width:4},{width:13}];
+  ["Ημερομηνία","Ημέρα","Τιμή","Όνομα"].forEach((t,i)=>hdr(ws.getCell(1,i+1),t));
+  res.rows.forEach((r,i)=>{
+    const row=ws.getRow(i+2);
+    row.getCell(1).value=toDate(r.day); row.getCell(1).numFmt="dd/mm/yyyy";
+    row.getCell(2).value=r.dayName; row.getCell(3).value=r.value; row.getCell(4).value=r.label||null;
+    for(let c=1;c<=4;c++){ const cell=row.getCell(c); cell.font={...FONT,bold:r.bold};
+      if(c===4) cell.alignment={horizontal:"center"}; if(r.color) cell.fill=fill(r.color); }
+  });
+  // Είσοδοι στις ίδιες θέσεις με το Excel
+  hdr(ws.getCell("E1"),"Ημέρα:"); ws.getCell("F1").value=inp.f1; ws.getCell("F1").font=FONT;
+  ["Ημερομηνία A","Ημερομηνία B","Ημερομηνία C"].forEach((t,i)=>{ hdr(ws.getCell(i+1,10),t);
+    const v=isoToDay([inp.A,inp.B,inp.C][i]); const c=ws.getCell(i+1,11); c.font=FONT;
+    if(v!==null){ c.value=toDate(v); c.numFmt="dd/mm/yyyy"; } });
+  hdr(ws.getCell("M1"),"Ημερομηνία"); hdr(ws.getCell("N1"),"Όνομα");
+  inp.holidays.filter(h=>h.date && h.date!=="invalid").forEach((h,i)=>{ const c=ws.getCell(i+2,13); c.font=FONT;
+    if(h.date.startsWith("R:")) c.value=fmtRecurring(h.date.slice(2)); else { c.value=toDate(isoToDay(h.date)); c.numFmt="dd/mm/yyyy"; }
+    const n=ws.getCell(i+2,14); n.value=h.name||null; n.font=FONT; });
+  hdr(ws.getCell("P1"),"Απουσίες");
+  inp.absences.forEach((a,i)=>{ const v=isoToDay(a); const c=ws.getCell(i+2,16); c.font=FONT; if(v!==null){ c.value=toDate(v); c.numFmt="dd/mm/yyyy"; } });
+  // 156η μονάδα
+  const t=res.target>=0?res.rows[res.target]:null;
+  const H=ws.getCell("H1"), I=ws.getCell("I1");
+  if(t){ H.value=toDate(t.day); H.numFmt="dd/mm/yyyy"; I.value=t.dayName; } else { H.value="-"; I.value="-"; }
+  for(const c of [H,I]){ c.font={...FONT,bold:true}; c.alignment={horizontal:"center",vertical:"middle"}; c.fill=fill(t?COLORS.green:COLORS.red); }
+  return await wb.xlsx.writeBuffer();
+}
+async function offerFile(filename, buf){
+  // Μέσα στο claude.ai: δυνατότητα downloads. Αλλιώς: κανονική λήψη από τον browser.
+  if(window.claude && typeof window.claude.use==="function"){
+    const dl=await window.claude.use("downloads");
+    if(dl){ await dl.save({filename, data:new Blob([buf])}); return; }
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+$("export").onclick=async()=>{
+  if(!lastResult||lastResult.errs) return;
+  if(typeof ExcelJS==="undefined"){ $("saveStatus").textContent="Η εξαγωγή χρειάζεται σύνδεση στο internet."; return; }
+  const btn=$("export"); btn.disabled=true;
+  try{ await offerFile("Hmerominies.xlsx", await buildXlsx(lastResult, readInputs())); }
+  catch(e){ if(e&&e.code!=="declined") $("saveStatus").textContent="Η εξαγωγή δεν ολοκληρώθηκε."; }
+  finally{ btn.disabled=false; }
+};
+
+load();
+</script>
+</body>
+</html>
